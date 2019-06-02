@@ -6,6 +6,7 @@ import (
 	"github.com/sussadag/lets-build-a-simple-db/metacmd"
 	"github.com/sussadag/lets-build-a-simple-db/statement"
 	"github.com/sussadag/lets-build-a-simple-db/table"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -17,6 +18,9 @@ func printPrompt() {
 
 func getCommand(input *bufio.Reader) (text string) {
 	text, err := input.ReadString('\n')
+	if err == io.EOF {
+		os.Exit(0)
+	}
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -49,6 +53,12 @@ func main() {
 			continue
 		case statement.ErrSyntaxError:
 			fmt.Println("Syntax error. Could not parse statement.")
+			continue
+		case statement.ErrStringTooLong:
+			fmt.Println("String is too long.")
+			continue
+		case statement.ErrNegativeId:
+			fmt.Println("ID must be positive.")
 			continue
 		}
 		if err != nil {

@@ -2,7 +2,6 @@ package table_test
 
 import (
 	"github.com/sussadag/lets-build-a-simple-db/table"
-	"log"
 	"testing"
 )
 
@@ -54,7 +53,6 @@ func TestInsertIntoTwoPages(t *testing.T) {
 	tab := table.NewTable()
 	numRows := 20
 	for i := 1; i <= numRows; i++ {
-		log.Printf("inserting row with id %d", i)
 		err := tab.Insert(
 			table.Row{
 				Id:       int64(i),
@@ -76,7 +74,6 @@ func TestInsertIntoTwoPages(t *testing.T) {
 				out, r2)
 
 		}
-		log.Printf("Got row with id %d", out)
 		out += 1
 	}
 	if int(out-1) != numRows {
