@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/sussadag/lets-build-a-simple-db/metacmd"
 	"github.com/sussadag/lets-build-a-simple-db/statement"
+	"github.com/sussadag/lets-build-a-simple-db/table"
 	"log"
 	"os"
 	"strings"
@@ -24,6 +25,7 @@ func getCommand(input *bufio.Reader) (text string) {
 
 func main() {
 	input := bufio.NewReader(os.Stdin)
+	t := table.NewTable()
 	for {
 		printPrompt()
 		text := getCommand(input)
@@ -31,8 +33,8 @@ func main() {
 			// handle meta command
 			if err := metacmd.Execute(text); err != nil {
 				switch err {
-				case metacmd.ErrUnrecognizedCmd :
-						fmt.Printf("Unrecognized command '%s'\n", text)
+				case metacmd.ErrUnrecognizedCmd:
+					fmt.Printf("Unrecognized command '%s'\n", text)
 				default:
 					log.Fatalf("Failed to execute command '%s'", err)
 				}
@@ -40,13 +42,23 @@ func main() {
 			continue
 		}
 		// handle sql statement
-		s, err  := statement.Prepare(text)
-		if err == statement.ErrUnrecognizedStatement{
+		s, err := statement.Prepare(text, t)
+		switch err {
+		case statement.ErrUnrecognizedStatement:
 			fmt.Printf("Unrecognized keyword at start of '%s'\n", text)
 			continue
+		case statement.ErrSyntaxError:
+			fmt.Println("Syntax error. Could not parse statement.")
+			continue
 		}
-		err = statement.Execute(s)
-		if err != nil{
+		if err != nil {
+			fmt.Printf("Unexpected error '%s", err)
+			continue
+		}
+
+		// Execute prepared statement
+		err = statement.Execute(s, t)
+		if err != nil {
 			log.Fatalf("Fatal error while executing '%s', error '%s'", text, err)
 		}
 		fmt.Printf("Executed.\n")
