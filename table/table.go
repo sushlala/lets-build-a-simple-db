@@ -58,7 +58,7 @@ func NewTable() *Table {
 }
 
 var (
-	ErrTableFull = errors.New("Table full")
+	ErrTableFull = errors.New("table full")
 )
 
 // insertIntoPage marshals r into p as the indexInPage element
@@ -73,13 +73,10 @@ func insertIntoPage(p *page, r Row, indexInPage uint) {
 		// struct has some extra padding!
 		panic("size of binary representation different from struct size")
 	}
-	//log.Printf("copying bin repr at %p page, at %d index"+
-	//	" contents are '% x' \n", p, indexInPage, binaryR.Bytes())
 	copy(
 		p[indexInPage*rowSize:],
 		binaryR.Bytes(),
 	)
-	// log.Printf("final page is % x", p)
 }
 
 // getRowLocation gets the location of where to store the new
@@ -102,7 +99,6 @@ func (t *Table) Insert(r Row) error {
 
 		p = &page{}
 		t.pages[pageNum] = p
-		// log.Printf("allocating a new page at %p \n", p)
 	}
 	insertIntoPage(p, r, indexInPage)
 	t.nextFreeRow += 1
@@ -126,15 +122,12 @@ func readPage(p *page, c chan<- Row) {
 		if err == io.ErrUnexpectedEOF ||
 			// empty row means we hit end of contents on this page
 			*r == emptyRow {
-			// log.Printf("No more rows left in Table!")
 			break
 		}
 		if err != nil {
-			// log.Printf("Got error %v", err)
 			panic(err)
 		}
-		// log.Printf("got a row, at page %p values is % x",
-		//	p, r)
+
 		c <- *r
 		numRead += 1
 	}
@@ -146,11 +139,9 @@ func (t *Table) GetRows() <-chan Row {
 		for _, p := range t.pages {
 			if p == nil {
 				// no more pages in our append-only Table
-				// log.Println("no more pages!")
 				close(c)
 				break
 			}
-			// log.Println("got a page!")
 			readPage(p, c)
 		}
 	}()
