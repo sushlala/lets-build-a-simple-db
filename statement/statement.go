@@ -10,6 +10,7 @@ import (
 var (
 	ErrUnrecognizedStatement = errors.New("statement not recognized")
 	ErrSyntaxError           = errors.New("syntax error. Could not parse statement")
+	ErrTableFull             = errors.New("table full")
 )
 
 const (

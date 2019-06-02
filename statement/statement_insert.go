@@ -32,5 +32,9 @@ func prepareInsert(cmd string) (*insertStatement, error) {
 }
 
 func (s *insertStatement) Execute(t *table.Table) error {
-	return t.Insert(s.r)
+	err := t.Insert(s.r)
+	if err == table.ErrTableFull {
+		return ErrTableFull
+	}
+	return err
 }

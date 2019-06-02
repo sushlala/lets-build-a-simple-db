@@ -58,6 +58,11 @@ func main() {
 
 		// Execute prepared statement
 		err = statement.Execute(s, t)
+		switch err {
+		case statement.ErrTableFull:
+			fmt.Println("Error: Table full.")
+			continue
+		}
 		if err != nil {
 			log.Fatalf("Fatal error while executing '%s', error '%s'", text, err)
 		}

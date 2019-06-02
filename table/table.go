@@ -140,10 +140,12 @@ func (t *Table) GetRows() <-chan Row {
 			if p == nil {
 				// no more pages in our append-only Table
 				close(c)
-				break
+				return
 			}
 			readPage(p, c)
 		}
+		// every page had contents
+		close(c)
 	}()
 	return c
 }
