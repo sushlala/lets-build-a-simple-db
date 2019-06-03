@@ -14,7 +14,11 @@ func prepareSelect(cmd string) (*selectStatement, error) {
 }
 
 func (s *selectStatement) Execute(t *table.Table) error {
-	for r := range t.GetRows() {
+	for i := range t.GetRows() {
+		if i.Err != nil {
+			return i.Err
+		}
+		r := i.Row
 		fmt.Printf(
 			"(%d, %s, %s)\n",
 			r.Id,

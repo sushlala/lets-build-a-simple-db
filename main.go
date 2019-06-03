@@ -27,18 +27,29 @@ func getCommand(input *bufio.Reader) (text string) {
 	return strings.Replace(text, "\n", "", -1)
 }
 
+func getDbFileName() string {
+	if len(os.Args) < 2 {
+		log.Fatalf("Must supply a database filename")
+	}
+	return os.Args[1]
+}
+
 func main() {
+	dbFileName := getDbFileName()
 	input := bufio.NewReader(os.Stdin)
-	t := table.NewTable()
+	t, err := table.OpenDb(dbFileName)
+	if err != nil {
+		log.Fatalf("Failed to open the db: '%s'", err)
+	}
 	for {
 		printPrompt()
-		text := getCommand(input)
-		if strings.HasPrefix(text, ".") {
+		line := getCommand(input)
+		if strings.HasPrefix(line, ".") {
 			// handle meta command
-			if err := metacmd.Execute(text); err != nil {
+			if err := metacmd.Execute(line, t); err != nil {
 				switch err {
 				case metacmd.ErrUnrecognizedCmd:
-					fmt.Printf("Unrecognized command '%s'\n", text)
+					fmt.Printf("Unrecognized command '%s'\n", line)
 				default:
 					log.Fatalf("Failed to execute command '%s'", err)
 				}
@@ -46,10 +57,10 @@ func main() {
 			continue
 		}
 		// handle sql statement
-		s, err := statement.Prepare(text, t)
+		s, err := statement.Prepare(line, t)
 		switch err {
 		case statement.ErrUnrecognizedStatement:
-			fmt.Printf("Unrecognized keyword at start of '%s'\n", text)
+			fmt.Printf("Unrecognized keyword at start of '%s'\n", line)
 			continue
 		case statement.ErrSyntaxError:
 			fmt.Println("Syntax error. Could not parse statement.")
@@ -74,7 +85,7 @@ func main() {
 			continue
 		}
 		if err != nil {
-			log.Fatalf("Fatal error while executing '%s', error '%s'", text, err)
+			log.Fatalf("Error while executing statement: '%s'", err)
 		}
 		fmt.Printf("Executed.\n")
 	}

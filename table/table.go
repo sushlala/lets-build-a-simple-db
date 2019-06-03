@@ -46,15 +46,26 @@ type page [pageSize]byte
 type Table struct {
 	// current number of rows in Table
 	nextFreeRow uint
-	// pointer to pages that contain
-	// rows of data
-	pages [maxNumPages]*page
+	p           *pager
 }
 
-// NewTable returns the single
-// Table that we maintain in-memory
-func NewTable() *Table {
-	return &Table{}
+// OpenDb opens a connection to the database
+// in the form of the only table we support
+func OpenDb(filename string) (*Table, error) {
+	p, err := newPager(filename)
+	if err != nil {
+		return nil, err
+	}
+	t := &Table{
+		p:           p,
+		nextFreeRow: uint(p.fileSize) / rowSize,
+	}
+	return t, nil
+}
+
+// CloseDb flushes the database to disk
+func (t *Table) CloseDb() error {
+	return t.p.flushToDisk(t.nextFreeRow)
 }
 
 var (
@@ -93,12 +104,9 @@ func (t *Table) Insert(r Row) error {
 	if pageNum >= maxNumPages {
 		return ErrTableFull
 	}
-	p := t.pages[pageNum]
-	if p == nil {
-		// only allocate a new page when needed
-
-		p = &page{}
-		t.pages[pageNum] = p
+	p, err := t.p.getPage(pageNum)
+	if err != nil {
+		return err
 	}
 	insertIntoPage(p, r, indexInPage)
 	t.nextFreeRow += 1
@@ -106,7 +114,7 @@ func (t *Table) Insert(r Row) error {
 }
 
 // readPage reads Rows off p and emits them to c
-func readPage(p *page, c chan<- Row) {
+func readPage(p *page, c chan<- GetRowsResult) {
 
 	bArray := [pageSize]byte(*p)
 	bSlice := bArray[:]
@@ -127,24 +135,44 @@ func readPage(p *page, c chan<- Row) {
 		if err != nil {
 			panic(err)
 		}
-
-		c <- *r
+		c <- GetRowsResult{
+			nil,
+			*r,
+		}
 		numRead += 1
 	}
 	return
 }
-func (t *Table) GetRows() <-chan Row {
-	c := make(chan Row)
+
+type GetRowsResult struct {
+	Err error
+	Row Row
+}
+
+// GetRows provides a handle that emits all rows present
+// in insertion order
+func (t *Table) GetRows() <-chan GetRowsResult {
+	c := make(chan GetRowsResult)
 	go func() {
-		for _, p := range t.pages {
-			if p == nil {
-				// no more pages in our append-only Table
+		numPagesInTable := t.nextFreeRow / rowsPerPage
+		if t.nextFreeRow%rowsPerPage != 0 {
+			// there is a partial page
+			numPagesInTable += 1
+		}
+
+		for i := uint(0); i < numPagesInTable; i += 1 {
+			p, err := t.p.getPage(i)
+			if err != nil {
+				c <- GetRowsResult{
+					err,
+					Row{},
+				}
 				close(c)
 				return
 			}
+			// readPage knows to stop reading a partial page
 			readPage(p, c)
 		}
-		// every page had contents
 		close(c)
 	}()
 	return c

@@ -2,6 +2,8 @@ package table_test
 
 import (
 	"github.com/sussadag/lets-build-a-simple-db/table"
+	"log"
+	"os"
 	"testing"
 )
 
@@ -23,15 +25,25 @@ func TestInsertOneRow(t *testing.T) {
 		Email:    emailArr,
 	}
 
-	tab := table.NewTable()
-	err := tab.Insert(r)
+	tab, err := table.OpenDb("temp.db")
+	defer func() {
+		os.Remove("temp.db")
+	}()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = tab.Insert(r)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for r2 := range tab.GetRows() {
-		if r != r2 {
-			t.Logf("Got '% x', sent '% x'", r2, r)
+	for i := range tab.GetRows() {
+		if i.Err != nil {
+			t.Fatal(i.Err)
+		}
+		if r != i.Row {
+			t.Logf("Got '% x', sent '% x'", i.Row, r)
 			t.Fatalf("Did not get what we put in")
 		}
 	}
@@ -50,7 +62,13 @@ func TestInsertIntoTwoPages(t *testing.T) {
 		copy(emailArr[:], []byte(a)[:])
 	}
 
-	tab := table.NewTable()
+	tab, err := table.OpenDb("temp.db")
+	defer func() {
+		os.Remove("temp.db")
+	}()
+	if err != nil {
+		t.Fatal(err)
+	}
 	numRows := 20
 	for i := 1; i <= numRows; i++ {
 		err := tab.Insert(
@@ -66,7 +84,11 @@ func TestInsertIntoTwoPages(t *testing.T) {
 	}
 
 	out := int64(1)
-	for r2 := range tab.GetRows() {
+	for i := range tab.GetRows() {
+		if i.Err != nil {
+			log.Fatal(i.Err)
+		}
+		r2 := i.Row
 		if r2.Id != out {
 			t.Fatalf(
 				"Unexpected value. "+

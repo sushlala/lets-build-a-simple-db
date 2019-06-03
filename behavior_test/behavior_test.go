@@ -4,17 +4,17 @@ package behavior_test
 
 import (
 	"bytes"
-	"fmt"
 	. "github.com/smartystreets/goconvey/convey"
 	"log"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"testing"
 )
 
-func runCommands(cmds []string) []string {
-	cmd := exec.Command("go", "run", "../main.go")
+func runCommands(cmds []string, dbfile string) []string {
+	cmd := exec.Command("go", "run", "../main.go", dbfile)
 
 	var outb, errb bytes.Buffer
 	cmd.Stdout = &outb
@@ -22,7 +22,7 @@ func runCommands(cmds []string) []string {
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		fmt.Println(err) //replace with logger, or anything you want
+		log.Fatal(err)
 	}
 
 	err = cmd.Start()
@@ -50,7 +50,8 @@ func runCommands(cmds []string) []string {
 	return strings.Split(out, "\n")
 }
 
-func TestInsertOneRow(t *testing.T) {
+func TestSpec(t *testing.T) {
+	dbFile := "tmp.db"
 	Convey("database behaves correctly", t, func() {
 
 		Convey("on inserting a row returns it", func() {
@@ -58,11 +59,21 @@ func TestInsertOneRow(t *testing.T) {
 				"insert 1 user1 person1@example.com",
 				"select",
 				".exit"}
-			output := runCommands(cmds)
-			So(output, ShouldResemble, []string{"db >Executed.",
-				"db >(1, user1, person1@example.com)",
-				"Executed.",
-				"db >"})
+			output := runCommands(cmds, dbFile)
+			defer func() {
+				os.Remove(dbFile)
+			}()
+
+			So(
+				output,
+				ShouldResemble,
+				[]string{
+					"db >Executed.",
+					"db >(1, user1, person1@example.com)",
+					"Executed.",
+					"db >",
+				},
+			)
 
 		})
 
@@ -75,7 +86,11 @@ func TestInsertOneRow(t *testing.T) {
 				)
 			}
 			cmds = append(cmds, ".exit")
-			output := runCommands(cmds)
+			dbFile := "tmp.db"
+			output := runCommands(cmds, dbFile)
+			defer func() {
+				os.Remove(dbFile)
+			}()
 			So(output[len(output)-2], ShouldEqual, "db >Error: Table full.")
 		})
 
@@ -88,7 +103,11 @@ func TestInsertOneRow(t *testing.T) {
 				"select",
 				".exit",
 			}
-			output := runCommands(cmds)
+			dbFile := "tmp.db"
+			output := runCommands(cmds, dbFile)
+			defer func() {
+				os.Remove(dbFile)
+			}()
 
 			So(output[len(output)-3], ShouldEqual, "db >(1, "+longUsername+", "+longEmail+")")
 		})
@@ -102,7 +121,11 @@ func TestInsertOneRow(t *testing.T) {
 				"select",
 				".exit",
 			}
-			output := runCommands(cmds)
+			dbFile := "tmp.db"
+			output := runCommands(cmds, dbFile)
+			defer func() {
+				os.Remove(dbFile)
+			}()
 
 			So(output[len(output)-3], ShouldEqual, "db >String is too long.")
 		})
@@ -112,9 +135,76 @@ func TestInsertOneRow(t *testing.T) {
 				"select",
 				".exit",
 			}
-			output := runCommands(cmds)
+			output := runCommands(cmds, dbFile)
+			defer func() {
+				os.Remove(dbFile)
+			}()
 
 			So(output[len(output)-3], ShouldEqual, "db >ID must be positive.")
+		})
+
+		Convey("keeps data after closing connection", func() {
+
+			Convey("insert one item and close connection", func() {
+				cmds := []string{
+					"insert 1 user1 person1@example.com",
+					".exit",
+				}
+				output := runCommands(cmds, dbFile)
+				So(
+					output,
+					ShouldResemble,
+					[]string{
+						"db >Executed.",
+						"db >",
+					},
+				)
+			})
+			Convey("the item exists in a new connection", func() {
+				cmds := []string{
+					"select",
+					".exit",
+				}
+				output := runCommands(cmds, dbFile)
+				defer func() {
+					os.Remove(dbFile)
+				}()
+				So(
+					output[0],
+					ShouldEqual,
+					"db >(1, user1, person1@example.com)",
+				)
+			})
+			Convey("insert 20 items and close connection", func() {
+				cmds := []string{}
+				for i := 1; i <= 20; i++ {
+					cmds = append(cmds, "insert "+strconv.Itoa(i)+" user1 person1@example.com")
+				}
+				cmds = append(cmds, ".exit")
+				output := runCommands(cmds, dbFile)
+				So(
+					output[len(output)-2],
+					ShouldEqual,
+					"db >Executed.",
+				)
+			})
+			Convey("20th item exists in a new connection", func() {
+				cmds := []string{
+					"select",
+					".exit",
+				}
+				output := runCommands(cmds, dbFile)
+				defer func() {
+					os.Remove(dbFile)
+				}()
+				//log.Printf("Got back %s\n", output)
+				So(
+					output[len(output)-3],
+					ShouldEqual,
+					"db >(1, user1, person1@example.com)",
+				)
+			})
+
 		})
 
 	})
