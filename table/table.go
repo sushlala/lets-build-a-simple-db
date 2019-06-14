@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"log"
 	"unsafe"
 )
 
@@ -16,7 +17,7 @@ import (
 // 		========== 		==============
 // 		id				integer
 //		username		varchar(32)
-//		email			varchar(255)
+//		email			varchar(256)
 
 // Row in our append-only Table
 type Row struct {
@@ -35,8 +36,8 @@ const (
 	// eventually we'll only be bound by the size of
 	// backing physical storage
 	maxNumPages = 100
-	rowSize     = uint(unsafe.Sizeof(Row{}))
-	rowsPerPage = pageSize / rowSize
+	rowSize     = uint(unsafe.Sizeof(Row{})) // is 296
+	rowsPerPage = pageSize / rowSize         // is 13
 )
 
 type page [pageSize]byte
@@ -105,6 +106,7 @@ func (t *Table) Insert(r Row) error {
 		return ErrTableFull
 	}
 	p, err := t.p.getPage(pageNum)
+	log.Printf("got page to insert into at address %p", p)
 	if err != nil {
 		return err
 	}
@@ -155,8 +157,10 @@ func (t *Table) GetRows() <-chan GetRowsResult {
 	c := make(chan GetRowsResult)
 	go func() {
 		numPagesInTable := t.nextFreeRow / rowsPerPage
+		log.Printf("numPagesInTable=%d", numPagesInTable)
 		if t.nextFreeRow%rowsPerPage != 0 {
 			// there is a partial page
+			log.Printf("partial page! increased number numPagesInTable=%d", numPagesInTable)
 			numPagesInTable += 1
 		}
 
@@ -171,6 +175,7 @@ func (t *Table) GetRows() <-chan GetRowsResult {
 				return
 			}
 			// readPage knows to stop reading a partial page
+			log.Printf("asking to read pageNum %d", i)
 			readPage(p, c)
 		}
 		close(c)
