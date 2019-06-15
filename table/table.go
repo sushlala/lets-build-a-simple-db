@@ -37,8 +37,7 @@ const (
 	// backing physical storage
 	maxNumPages = 100
 	rowSize     = uint(unsafe.Sizeof(Row{})) // is 296
-	//rowsPerPage = pageSize / rowSize         // is 13
-	rowsPerPage = 13
+	rowsPerPage = pageSize / rowSize         // is 13
 )
 
 type page [pageSize]byte
