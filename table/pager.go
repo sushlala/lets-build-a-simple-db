@@ -3,7 +3,6 @@ package table
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 )
 
@@ -53,7 +52,6 @@ func (pag *pager) isPageOnDisk(pageNum uint) bool {
 	numRowsOnDisk := uint(pag.fileSize) / rowSize
 	numPagesOnDisk := numRowsOnDisk / rowsPerPage
 
-	log.Printf("filesize is %d, rowSize is %d, numPagesOnDisk is %d, pageNum is %d", pag.fileSize, rowSize, numPagesOnDisk, pageNum)
 	if numRowsOnDisk%rowsPerPage != 0 {
 		numPagesOnDisk += 1
 	}
@@ -64,12 +62,10 @@ func (pag *pager) isPageOnDisk(pageNum uint) bool {
 // index into p
 func (pag *pager) copyPageFromDisk(p *page, num uint) error {
 	actualBytesOnDiskPerPage := rowsPerPage * rowSize
-	log.Printf("copyPageFromDisk() actualBytesOnDiskPerPage=%d, num=%d, len=%d", actualBytesOnDiskPerPage, num, len(p[:actualBytesOnDiskPerPage]))
 	n, err := pag.f.ReadAt(
 		[]byte(p[:actualBytesOnDiskPerPage]),
 		int64(num*actualBytesOnDiskPerPage),
 	)
-	log.Printf("read page, %x", *p)
 	if err == io.EOF {
 		// we might have read a partial page off disk
 		if uint(n)%rowSize != 0 {
@@ -93,24 +89,18 @@ func (pag *pager) getPage(num uint) (*page, error) {
 
 	p := pag.pages[num]
 	if p == nil {
-		log.Printf("cache miss!")
 		// Cache miss. Allocate memory and load from file.
 		p = new(page)
 		pag.pages[num] = p
 
 		// was this page on disk?
 		if pag.isPageOnDisk(num) {
-			log.Printf("getting the page from disk!")
 			if err := pag.copyPageFromDisk(p, num); err != nil {
 				return nil, err
 			}
 		} else {
-			log.Printf("page not on disk")
 		}
-	} else {
-		log.Printf("cache hit!")
 	}
-
 	return p, nil
 }
 
@@ -134,15 +124,12 @@ func (pag *pager) flushPage(pageNum uint) error {
 // flushToDisk walks the cache of pages we
 // have and flushes them to disk
 func (pag *pager) flushToDisk(numRowsInTable uint) error {
-	log.Printf("flusing %d rows", numRowsInTable)
 	numFullPages := numRowsInTable / rowsPerPage
-	log.Printf("num full pages is %d", numFullPages)
 	for i := uint(0); i < numFullPages; i++ {
 		p := pag.pages[i]
 		if p == nil {
 			continue
 		}
-		log.Printf("flusing full page number %d", i)
 		if err := pag.flushPage(i); err != nil {
 			return err
 		}
@@ -153,7 +140,6 @@ func (pag *pager) flushToDisk(numRowsInTable uint) error {
 		// For some reason we wont need to do this
 		// after we switch to using b-trees
 		rowsInLastPage := numRowsInTable % rowsPerPage
-		log.Printf("there is a partial page (pageNum=%d) with %d rows, flusing it", numFullPages, rowsInLastPage)
 		err := pag.flushPartialPage(numFullPages, rowsInLastPage)
 		if err != nil {
 			return err

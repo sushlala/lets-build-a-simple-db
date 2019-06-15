@@ -37,7 +37,8 @@ const (
 	// backing physical storage
 	maxNumPages = 100
 	rowSize     = uint(unsafe.Sizeof(Row{})) // is 296
-	rowsPerPage = pageSize / rowSize         // is 13
+	//rowsPerPage = pageSize / rowSize         // is 13
+	rowsPerPage = 13
 )
 
 type page [pageSize]byte
@@ -76,7 +77,7 @@ var (
 // insertIntoPage marshals r into p as the indexInPage element
 func insertIntoPage(p *page, r Row, indexInPage uint) {
 	// marshal r in to binary form
-	binaryR := new(bytes.Buffer)
+	binaryR := &bytes.Buffer{}
 	err := binary.Write(binaryR, binary.LittleEndian, r)
 	if err != nil {
 		panic("failed to marshal row")
@@ -151,6 +152,10 @@ type GetRowsResult struct {
 	Row Row
 }
 
+func (t *Table) lastPageIsPartiallyFull() bool {
+	return t.nextFreeRow%rowsPerPage != 0
+}
+
 // GetRows provides a handle that emits all rows present
 // in insertion order
 func (t *Table) GetRows() <-chan GetRowsResult {
@@ -158,8 +163,7 @@ func (t *Table) GetRows() <-chan GetRowsResult {
 	go func() {
 		numPagesInTable := t.nextFreeRow / rowsPerPage
 		log.Printf("numPagesInTable=%d", numPagesInTable)
-		if t.nextFreeRow%rowsPerPage != 0 {
-			// there is a partial page
+		if t.lastPageIsPartiallyFull() {
 			log.Printf("partial page! increased number numPagesInTable=%d", numPagesInTable)
 			numPagesInTable += 1
 		}

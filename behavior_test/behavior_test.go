@@ -197,11 +197,10 @@ func TestSpec(t *testing.T) {
 				defer func() {
 					os.Remove(dbFile)
 				}()
-				//log.Printf("Got back %s\n", output)
 				So(
 					output[len(output)-3],
 					ShouldEqual,
-					"db >(1, user1, person1@example.com)",
+					"(20, user1, person1@example.com)",
 				)
 			})
 
